@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electricidad Arriaga´s - Presupuesto</title>
+
+<!-- ===== PWA ===== -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<style>
+  body { 
+    margin:0; font-family: Arial, sans-serif; background:#1a1a1a; color:#fff;
+  }
+  #barra-superior {
+    display:flex; justify-content:space-between; align-items:center;
+    background:#000; color:#FFD700; padding:15px 20px; font-weight:bold;
+    box-shadow:0 2px 5px rgba(0,0,0,0.3);
+    font-size:18px;
+  }
+  #presupuesto {
+    max-width:1000px; margin:20px auto; background:#333;
+    padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  }
+  h1 { text-align:center; color:#FFD700; margin-bottom:10px; font-size:28px; }
+  .botones-presupuesto { text-align:center; margin-bottom:20px; }
+  .botones-presupuesto button {
+    margin:0 5px; padding:8px 15px; cursor:pointer;
+    background:#FFD700; color:#000; border:none; border-radius:4px; font-weight:bold;
+  }
+
+  .categoria { margin-top:20px; border-bottom:1px solid #555; padding-bottom:5px; }
+  .categoria strong { font-size:1.1em; color:#FFD700; }
+
+  #items-presupuesto { display:block; }
+  .item { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #555; }
+  .item span.desc { flex:1; }
+  .item span.precio { width:200px; text-align:right; }
+  .item input { width:50px; text-align:center; margin-left:10px; background:#555; color:#fff; border:none; border-radius:4px; }
+
+  #descuento-container { margin-top:20px; display:flex; justify-content:flex-end; align-items:center; }
+  #descuento-container input { width:60px; text-align:center; margin-left:10px; }
+
+  #presupuesto-total {
+    font-weight:bold; border-top:2px solid #FFD700; margin-top:20px; padding-top:10px;
+    font-size:1.2em; display:flex; justify-content:space-between;
+  }
+
+  .hoja-cliente { display:none; }
+
+  @media print {
+    body { background:#fff; color:#000; }
+    .botones-presupuesto, #descuento-container, #barra-superior { display:none; }
+    #presupuesto { box-shadow:none; border:none; margin:0; padding:10px; }
+    h1 { font-size:16pt; color:#000; text-align:center; }
+    .item { border-bottom:1px solid #000; font-size:7pt; color:#000; }
+    .categoria { font-size:8pt; border-bottom:2px solid #000; color:#000; }
+    #presupuesto-total { font-size:9pt; color:#000; }
+    #items-presupuesto { display:flex; flex-wrap:wrap; }
+    .item { width:48%; margin-right:2%; }
+    .hoja-cliente { display:block; page-break-after: always; color:#000; background:#fff; padding:10px; }
+  }
+</style>
+</head>
+
+<body>
+
+<div id="barra-superior">
+  <div>⚡ Electricidad Arriaga´s</div>
+  <div id="fecha-hora"></div>
+</div>
+
+<div id="presupuesto">
+  <h1>⚡ Electricidad Arriaga´s - Presupuesto</h1>
+
+  <div class="botones-presupuesto">
+    <button onclick="imprimirPresupuesto()">Imprimir</button>
+    <button onclick="descargarPDF()">Descargar PDF</button>
+    <button onclick="descargarImagen()">Descargar Imagen</button>
+  </div>
+
+  <div id="items-presupuesto"></div>
+
+  <div id="descuento-container">
+    <label>Descuento %:</label>
+    <input type="number" id="descuento-manual" value="0" onchange="actualizarPresupuesto()">
+  </div>
+
+  <div id="presupuesto-total">
+    <span>Subtotal / Total:</span>
+    <span id="total-final">AR$ 0</span>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  function actualizarFechaHora() {
+    const ahora = new Date();
+    document.getElementById("fecha-hora").textContent = ahora.toLocaleString();
+  }
+  setInterval(actualizarFechaHora,1000);
+  actualizarFechaHora();
+
+  const items = [
+    {cat:"Tableros", desc:"TP Monofásicos", precio:0, cant:0},
+    {cat:"Tableros", desc:"Tablero Principal con 1 ID y 1 TM + PAT", precio:253859, cant:0},
+    {cat:"Tableros", desc:"Solo PAT", precio:128855, cant:0},
+    {cat:"Tableros", desc:"TP Trifásicos", precio:0, cant:0},
+    {cat:"Tableros", desc:"ID, ITM u otro módulo bipolar adicional", precio:62415, cant:0},
+    {cat:"Tableros", desc:"ID tetrapolar", precio:107453, cant:0},
+    {cat:"Tableros", desc:"ITM tetrapolar", precio:107453, cant:0},
+    {cat:"Tableros", desc:"ITM tripolar", precio:90651, cant:0},
+    {cat:"Tableros", desc:"Tableros Seccionales", precio:180424, cant:0},
+    {cat:"Tableros", desc:"De 8 a 36 polos", precio:721784, cant:0},
+    {cat:"Tableros", desc:"De 36 a 54 polos", precio:1082627, cant:0},
+    {cat:"Canalización", desc:"Amurado de cañeria en mampostería Ladrillo común", precio:49441, cant:0},
+    {cat:"Canalización", desc:"Amurado de cañeria en mampostería Ladrillo hueco", precio:48266, cant:0},
+    {cat:"Canalización", desc:"Ladrillo común", precio:11816, cant:0},
+    {cat:"Canalización", desc:"Ladrillo hueco", precio:11585, cant:0},
+    {cat:"Canalización", desc:"Amurado de cañeria a la vista Metal, PVC, Cablecanal (14x30)", precio:39517, cant:0},
+    {cat:"Canalización", desc:"Pase de viga y/o columna", precio:45886, cant:0},
+    {cat:"Canalización", desc:"Cable subterráneo Tierra", precio:43003, cant:0},
+    {cat:"Canalización", desc:"Cable subterráneo Piso", precio:45886, cant:0},
+    {cat:"Canalización", desc:"Adicional por cada caja de paso Tierra", precio:47225, cant:0},
+    {cat:"Canalización", desc:"Adicional por cada caja de paso Piso", precio:50428, cant:0},
+    {cat:"Cableado", desc:"Cableado en obra nueva - Opción 1", precio:21144, cant:0},
+    {cat:"Cableado", desc:"Cableado en obra nueva - Opción 2", precio:29442, cant:0},
+    {cat:"Cableado", desc:"Recableado con artefactos", precio:44150, cant:0},
+    {cat:"Cableado", desc:"Recableado sin artefactos", precio:29442, cant:0},
+    {cat:"Puntos y Tomas", desc:"Punto, toma simple, portalámpara", precio:15347, cant:0},
+    {cat:"Puntos y Tomas", desc:"Toma doble", precio:19437, cant:0},
+    {cat:"Puntos y Tomas", desc:"Punto Combinación", precio:16518, cant:0},
+    {cat:"Artefactos", desc:"Artefacto aplique simple", precio:23550, cant:0},
+    {cat:"Artefactos", desc:"Spot LED por unidad", precio:23550, cant:0},
+    {cat:"Artefactos", desc:"Colgante liviano 3 luces 1 efecto", precio:47102, cant:0},
+    {cat:"Artefactos", desc:"Colgante liviano 5 luces 1 efecto", precio:62397, cant:0},
+    {cat:"Artefactos", desc:"Adicional x efecto", precio:15347, cant:0},
+    {cat:"Artefactos", desc:"Colgante pesado - mínimo", precio:82406, cant:0},
+    {cat:"Artefactos", desc:"Tubo LED simple 7-36W", precio:47102, cant:0},
+    {cat:"Artefactos", desc:"Tubo LED doble 7-36W", precio:57982, cant:0},
+    {cat:"Artefactos", desc:"Tubo LED 45W", precio:58901, cant:0},
+    {cat:"Artefactos", desc:"Tubo LED doble 45W", precio:73091, cant:0},
+    {cat:"Artefactos", desc:"Ventilador de techo", precio:85935, cant:0},
+    {cat:"Artefactos", desc:"Ventilador de techo con luminaria 1 efecto", precio:107453, cant:0},
+    {cat:"Automatismos", desc:"Contactores", precio:107453, cant:0},
+    {cat:"Automatismos", desc:"Sensores", precio:94530, cant:0}
+  ];
+
+  const itemsContainer = document.getElementById('items-presupuesto');
+  const totalFinal = document.getElementById('total-final');
+
+  function actualizarPresupuesto() {
+    itemsContainer.innerHTML='';
+    let subtotal = 0;
+    let categoriaActual = '';
+    items.forEach((i,index)=>{
+      if(i.cat!==categoriaActual){
+        categoriaActual=i.cat;
+        const catDiv=document.createElement('div');
+        catDiv.className='categoria';
+        catDiv.innerHTML=`<strong>${i.cat}</strong>`;
+        itemsContainer.appendChild(catDiv);
+      }
+      const itemDiv=document.createElement('div');
+      itemDiv.className='item';
+      itemDiv.innerHTML=`
+        <span class="desc">${i.desc}</span>
+        <span class="precio">AR$ ${i.precio.toLocaleString()} x 
+          <input type="number" min="0" value="${i.cant}" onchange="cambiarCantidad(${index}, this.value)">
+        </span>
+      `;
+      itemsContainer.appendChild(itemDiv);
+      subtotal+=i.precio*i.cant;
+    });
+
+    const descuentoPorc=parseFloat(document.getElementById('descuento-manual').value)||0;
+    const descuentoValor=subtotal*descuentoPorc/100;
+    const total=subtotal-descuentoValor;
+    totalFinal.textContent=`Subtotal: AR$ ${subtotal.toLocaleString()} - Descuento: AR$ ${descuentoValor.toLocaleString()} (${descuentoPorc}%) = Total: AR$ ${total.toLocaleString()}`;
+  }
+
+  function cambiarCantidad(index,value){
+    items[index].cant=parseInt(value)||0;
+    actualizarPresupuesto();
+  }
+
+  actualizarPresupuesto();
+
+  function imprimirPresupuesto(){ window.print(); }
+
+  function descargarImagen(){
+    html2canvas(document.getElementById('presupuesto'),{scale:2}).then(canvas=>{
+      const link=document.createElement('a');
+      link.download='presupuesto.png';
+      link.href=canvas.toDataURL();
+      link.click();
+    });
+  }
+
+  async function descargarPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    const canvas = await html2canvas(document.getElementById('presupuesto'),{scale:2});
+    const imgData = canvas.toDataURL('image/png');
+    const imgProps=doc.getImageProperties(imgData);
+    const pdfWidth=doc.internal.pageSize.getWidth();
+    const pdfHeight=(imgProps.height*pdfWidth)/imgProps.width;
+    doc.addImage(imgData,'PNG',0,0,pdfWidth,pdfHeight);
+    doc.save('presupuesto.pdf');
+  }
+</script>
+
+<!-- ===== REGISTRO SERVICE WORKER ===== -->
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
